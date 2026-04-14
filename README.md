@@ -334,10 +334,4 @@ No guessing. No semantic similarity. Every step is exact.
 
 ---
 
-## License
-
-MIT — use it, fork it, build on it.
-
----
-
 *Built with [LangGraph](https://github.com/langchain-ai/langgraph), [Groq](https://groq.com), and the ReAct pattern.*
