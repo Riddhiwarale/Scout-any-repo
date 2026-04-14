@@ -1,0 +1,22 @@
+# Core LLM & orchestration
+anthropic>=0.40.0
+langchain-anthropic>=0.3.0
+langchain-core>=0.3.0
+langgraph>=0.2.56
+
+# Symbol extraction
+tree-sitter-languages>=1.10.2
+
+# Git operations
+gitpython>=3.1.44
+
+# API server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+sse-starlette>=2.1.0
+
+# Config & utilities
+python-dotenv>=1.0.0
+pydantic-settings>=2.6.0
+pydantic>=2.10.0
+tiktoken>=0.8.0
