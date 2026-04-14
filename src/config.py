@@ -14,24 +14,25 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # --- Anthropic ---
-    anthropic_api_key: str = Field(..., alias="ANTHROPIC_API_KEY")
+    # --- Groq ---
+    groq_api_key: str = Field(..., alias="GROQ_API_KEY")
 
-    # --- Models ---
+    # --- Models (all served via Groq) ---
     orchestrator_model: str = Field(
-        "claude-3-7-sonnet-20250219", alias="ORCHESTRATOR_MODEL"
+        "llama-3.3-70b-versatile", alias="ORCHESTRATOR_MODEL"
     )
     explore_model: str = Field(
-        "claude-3-5-haiku-20241022", alias="EXPLORE_MODEL"
+        "llama-3.1-8b-instant", alias="EXPLORE_MODEL"
     )
     compactor_model: str = Field(
-        "claude-3-5-haiku-20241022", alias="COMPACTOR_MODEL"
+        "llama-3.1-8b-instant", alias="COMPACTOR_MODEL"
     )
 
     # --- Context management ---
     context_threshold: float = Field(0.70, alias="CONTEXT_THRESHOLD")
+    # llama-3.3-70b-versatile supports 128k context
     orchestrator_context_window: int = Field(
-        200_000, alias="ORCHESTRATOR_CONTEXT_WINDOW"
+        128_000, alias="ORCHESTRATOR_CONTEXT_WINDOW"
     )
 
     # --- Repository ---

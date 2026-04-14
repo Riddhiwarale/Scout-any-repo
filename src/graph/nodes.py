@@ -2,10 +2,10 @@
 LangGraph node functions for the Orchestrator graph.
 
 Nodes:
-  - orchestrator_node: Sonnet-powered ReAct reasoning step
+  - orchestrator_node: llama-3.3-70b-versatile ReAct reasoning step
   - tool_node:         Executes tool calls made by the Orchestrator
   - context_monitor_node: Counts tokens; triggers compaction if ≥ 70%
-  - compactor_node:    Haiku-powered history compression
+  - compactor_node:    Fast model history compression
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import json
 from typing import Any
 
 import tiktoken
-from langchain_anthropic import ChatAnthropic
+from langchain_groq import ChatGroq
 from langchain_core.messages import (
     AIMessage,
     HumanMessage,
@@ -41,7 +41,6 @@ def _count_tokens(messages: list) -> int:
     for msg in messages:
         content = msg.content if hasattr(msg, "content") else str(msg)
         if isinstance(content, list):
-            # Handle multi-part content blocks
             for block in content:
                 if isinstance(block, dict):
                     total += len(_ENCODER.encode(block.get("text", "")))
@@ -53,21 +52,20 @@ def _count_tokens(messages: list) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Factory: build LLMs & tool lists (done once per graph invocation to keep
-# the objects re-usable, but repo_path may differ per session)
+# Factory: build LLMs & tool lists
 # ---------------------------------------------------------------------------
 
 
 def _build_orchestrator_llm(repo_path: str):
-    """Create a Sonnet LLM with all tools (including explore_agent) bound."""
+    """Create the orchestrator LLM with all tools (including explore_agent) bound."""
     core_tools = create_tools(repo_path)
     explore_tool = make_explore_tool(repo_path)
     all_tools = core_tools + [explore_tool]
 
-    llm = ChatAnthropic(
+    llm = ChatGroq(
         model=settings.orchestrator_model,
         temperature=0,
-        api_key=settings.anthropic_api_key,
+        api_key=settings.groq_api_key,
         max_tokens=8192,
     )
     return llm.bind_tools(all_tools), all_tools
@@ -83,28 +81,17 @@ def _build_tool_node(repo_path: str) -> tuple[ToolNode, dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# Node: Orchestrator (Sonnet)
+# Node: Orchestrator
 # ---------------------------------------------------------------------------
 
 
 def make_orchestrator_node(repo_path: str):
     """Return an orchestrator node function bound to `repo_path`."""
     llm_with_tools, _ = _build_orchestrator_llm(repo_path)
-
-    # Build system message with cache_control so it is cached after the 1st call
-    system_message = SystemMessage(
-        content=[
-            {
-                "type": "text",
-                "text": ORCHESTRATOR_SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ]
-    )
+    system_message = SystemMessage(content=ORCHESTRATOR_SYSTEM_PROMPT)
 
     def orchestrator_node(state: AgentState) -> dict:
         messages = state["messages"]
-        # Prepend system message (not stored in state, added fresh each call)
         full_messages = [system_message] + list(messages)
         response: AIMessage = llm_with_tools.invoke(full_messages)
         return {"messages": [response]}
@@ -139,7 +126,7 @@ def context_monitor_node(state: AgentState) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Node: Compactor (Haiku)
+# Node: Compactor
 # ---------------------------------------------------------------------------
 
 
@@ -151,20 +138,19 @@ def compactor_node(state: AgentState) -> dict:
     """
     messages = state["messages"]
 
-    haiku = ChatAnthropic(
+    llm = ChatGroq(
         model=settings.compactor_model,
         temperature=0,
-        api_key=settings.anthropic_api_key,
+        api_key=settings.groq_api_key,
         max_tokens=4096,
     )
 
-    # Serialize history for the compactor
     history_text = _serialize_messages(messages)
     compaction_prompt = (
         f"Here is the full conversation history to compress:\n\n{history_text}"
     )
 
-    summary_response: AIMessage = haiku.invoke(
+    summary_response: AIMessage = llm.invoke(
         [
             SystemMessage(content=COMPACTOR_SYSTEM_PROMPT),
             HumanMessage(content=compaction_prompt),
@@ -173,7 +159,6 @@ def compactor_node(state: AgentState) -> dict:
 
     summary_content = summary_response.content
 
-    # Replace all messages with the summary + last human message (if present)
     last_human = _find_last_human_message(messages)
     compressed: list = [SystemMessage(content=summary_content)]
     if last_human:
@@ -231,7 +216,6 @@ def _serialize_messages(messages: list) -> str:
                 for b in content
             ]
             content = "\n".join(text_parts)
-        # Include tool call info for AI messages
         if isinstance(msg, AIMessage) and msg.tool_calls:
             calls = json.dumps(msg.tool_calls, default=str, indent=2)
             content = f"{content}\n[Tool calls: {calls}]" if content else f"[Tool calls: {calls}]"

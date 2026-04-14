@@ -1,5 +1,5 @@
 """
-Explore Agent — a Haiku-powered ReAct agent that handles deep, multi-step
+Explore Agent — a fast Groq-powered ReAct agent that handles deep, multi-step
 codebase investigations on behalf of the Orchestrator.
 
 The Orchestrator calls `make_explore_tool(repo_path)` which returns a
@@ -9,10 +9,9 @@ tool; internally it runs its own synchronous ReAct loop.
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
-from langchain_anthropic import ChatAnthropic
+from langchain_groq import ChatGroq
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 
@@ -56,24 +55,24 @@ _MAX_ITERATIONS = 20
 def make_explore_tool(repo_path: str):
     """Return an explore_agent tool bound to `repo_path`."""
 
-    # Pre-create the Haiku LLM for this tool instance
-    haiku_llm = ChatAnthropic(
+    # Fast Groq model for execution-heavy investigation
+    explore_llm = ChatGroq(
         model=settings.explore_model,
         temperature=0,
-        api_key=settings.anthropic_api_key,
+        api_key=settings.groq_api_key,
         max_tokens=8192,
     )
 
     # Tools available to the Explore Agent (no recursion — exclude explore_agent)
     explore_tools = create_tools(repo_path)
     tool_map: dict[str, Any] = {t.name: t for t in explore_tools}
-    haiku_with_tools = haiku_llm.bind_tools(explore_tools)
+    llm_with_tools = explore_llm.bind_tools(explore_tools)
 
     @tool
     def explore_agent(question: str) -> str:
         """
-        Delegate a COMPLEX, multi-file codebase investigation to the Explore Agent
-        (Claude Haiku). Use this when answering the question requires:
+        Delegate a COMPLEX, multi-file codebase investigation to the Explore Agent.
+        Use this when answering the question requires:
           - Tracing logic across multiple files
           - Following import chains or call graphs
           - Understanding data flow end-to-end
@@ -86,19 +85,13 @@ def make_explore_tool(repo_path: str):
             question: A detailed, self-contained question for the Explore Agent.
                       Include all relevant context from the conversation so far.
         """
-        system = SystemMessage(
-            content=[
-                {
-                    "type": "text",
-                    "text": EXPLORE_SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ]
-        )
-        messages: list = [system, HumanMessage(content=question)]
+        messages: list = [
+            SystemMessage(content=EXPLORE_SYSTEM_PROMPT),
+            HumanMessage(content=question),
+        ]
 
-        for iteration in range(_MAX_ITERATIONS):
-            response: AIMessage = haiku_with_tools.invoke(messages)
+        for _ in range(_MAX_ITERATIONS):
+            response: AIMessage = llm_with_tools.invoke(messages)
             messages.append(response)
 
             # No tool calls → agent has finished reasoning
@@ -123,7 +116,7 @@ def make_explore_tool(repo_path: str):
                     ToolMessage(content=str(result), tool_call_id=tool_id)
                 )
 
-        # Exceeded max iterations — return whatever the last message said
+        # Exceeded max iterations
         last = messages[-1]
         if isinstance(last, AIMessage):
             return last.content or "(Explore Agent reached iteration limit)"
