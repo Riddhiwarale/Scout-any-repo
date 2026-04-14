@@ -4,8 +4,16 @@ langchain-anthropic>=0.3.0
 langchain-core>=0.3.0
 langgraph>=0.2.56
 
-# Symbol extraction
-tree-sitter-languages>=1.10.2
+# Symbol extraction (new tree-sitter API for Python 3.13+)
+tree-sitter>=0.24.0
+tree-sitter-python
+tree-sitter-javascript
+tree-sitter-typescript
+tree-sitter-rust
+tree-sitter-go
+tree-sitter-java
+tree-sitter-c
+tree-sitter-cpp
 
 # Git operations
 gitpython>=3.1.44

@@ -2,7 +2,8 @@
 Symbol Extractor tool — extracts function, class, and method names with
 their start/end line numbers from source files.
 
-Primary implementation: tree-sitter via tree-sitter-languages package.
+Primary implementation: tree-sitter (>=0.24, new API) with individual
+language packages (tree-sitter-python, tree-sitter-javascript, etc.).
 Fallback: regex-based heuristic for common languages.
 """
 
@@ -13,7 +14,7 @@ from typing import Optional
 
 from langchain_core.tools import tool
 
-# Language extension mapping for tree-sitter-languages
+# Language extension → tree-sitter language key
 _EXT_TO_LANG = {
     ".py": "python",
     ".js": "javascript",
@@ -119,15 +120,52 @@ def _resolve(repo_path: str, file_path: str) -> Path:
     return (Path(repo_path) / file_path).resolve()
 
 
+def _get_ts_parser(lang: str):
+    """Return a tree-sitter Parser for the given language key, or None."""
+    try:
+        from tree_sitter import Language, Parser  # type: ignore
+
+        if lang == "python":
+            import tree_sitter_python as mod  # type: ignore
+            language = Language(mod.language())
+        elif lang in ("javascript", "jsx"):
+            import tree_sitter_javascript as mod  # type: ignore
+            language = Language(mod.language())
+        elif lang == "typescript":
+            import tree_sitter_typescript as mod  # type: ignore
+            language = Language(mod.language_typescript())
+        elif lang == "tsx":
+            import tree_sitter_typescript as mod  # type: ignore
+            language = Language(mod.language_tsx())
+        elif lang == "rust":
+            import tree_sitter_rust as mod  # type: ignore
+            language = Language(mod.language())
+        elif lang == "go":
+            import tree_sitter_go as mod  # type: ignore
+            language = Language(mod.language())
+        elif lang == "java":
+            import tree_sitter_java as mod  # type: ignore
+            language = Language(mod.language())
+        elif lang == "c":
+            import tree_sitter_c as mod  # type: ignore
+            language = Language(mod.language())
+        elif lang == "cpp":
+            import tree_sitter_cpp as mod  # type: ignore
+            language = Language(mod.language())
+        else:
+            return None
+
+        return Parser(language)
+    except Exception:
+        return None
+
+
 def _extract_tree_sitter(
     source: bytes, lang: str
 ) -> Optional[list[tuple[str, str, int, int]]]:
     """Return list of (name, type, start_line, end_line) or None on failure."""
-    try:
-        from tree_sitter_languages import get_parser  # type: ignore
-
-        parser = get_parser(lang)
-    except (ImportError, Exception):
+    parser = _get_ts_parser(lang)
+    if parser is None:
         return None
 
     try:
