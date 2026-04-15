@@ -1,12 +1,11 @@
-# Scout — AI Agent for GitHub Repository Q&A
+# Scout — QnA on any Github Repo
 
 > Ask natural language questions about any codebase. Get precise, code-cited answers powered by a multi-agent ReAct system.
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-orange)
-![Groq](https://img.shields.io/badge/Groq-LLaMA%203-red?logo=meta&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq-Free%20Inference-red?logo=meta&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-REST%20%2B%20SSE-green?logo=fastapi&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
 ---
 
@@ -21,21 +20,6 @@ Scout: Reads auth.py → traces imports → reads db/session.py → reads middle
 ```
 
 No RAG. No vector databases. No pre-indexing. Just an agent with the right tools.
-
----
-
-## Why Not RAG?
-
-Most codebase Q&A tools use Retrieval-Augmented Generation (RAG): embed all files into a vector database and retrieve "similar" chunks at query time. This works for documents, but breaks for code.
-
-| Problem with RAG | How Scout solves it |
-|---|---|
-| Chunking splits functions across boundaries | Agent reads exact line ranges |
-| Embedding similarity ≠ code precision | Grep finds by name with 100% precision |
-| Re-indexing required after every commit | Agent reads files directly from disk — always current |
-| Can't trace call graphs across files | Agent follows imports dynamically in a single query |
-
-Scout uses an **agentic approach**: no upfront indexing, exact search, dynamic cross-file tracing, always up-to-date.
 
 ---
 
@@ -71,7 +55,7 @@ User Query
     ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Orchestrator Agent                             │
-│              Model: llama-3.3-70b-versatile (Groq)         │
+│              Model: Configurable via Groq                   │
 │              Role:  Plan, reason, decide, synthesize        │
 │                                                             │
 │   Simple query?  ──► Call tools directly                   │
@@ -81,7 +65,7 @@ User Query
                             ▼
               ┌─────────────────────────────┐
               │       Explore Agent         │
-              │  Model: llama-3.1-8b-instant│
+              │  Model: Configurable        │
               │  Role:  Deep investigation  │
               │                             │
               │  Runs its own ReAct loop    │
@@ -91,9 +75,9 @@ User Query
 ```
 
 **Why two agents?**
-- The **Orchestrator** (70B) handles high-level reasoning and planning. This needs a capable model.
-- The **Explore Agent** (8B) handles execution — running grep, reading files, following references. A fast, lightweight model is perfect here.
-- This **cuts cost and latency** on the tool-execution loop while preserving quality where it matters.
+- The **Orchestrator** handles high-level reasoning and planning. A capable reasoning model is used here.
+- The **Explore Agent** handles execution — running grep, reading files, following references. A fast, lightweight model is used here.
+- This **tiered model strategy cuts latency** on the tool-execution loop while preserving quality where it matters.
 
 ---
 
@@ -122,7 +106,7 @@ User Query
          ▼
   ┌──────────────┐
   │  Compactor   │  ──► Replaces raw history with structured summary
-  │  (8b model)  │  ──► Conversation continues without context overflow
+  │              │  ──► Conversation continues without context overflow
   └──────────────┘
 ```
 
@@ -165,8 +149,8 @@ The conversation can continue indefinitely without degrading quality.
 | Component | Technology |
 |---|---|
 | Agent Orchestration | [LangGraph](https://github.com/langchain-ai/langgraph) — StateGraph with conditional edges |
-| Orchestrator LLM | `llama-3.3-70b-versatile` via [Groq](https://groq.com) |
-| Explore / Compactor LLM | `llama-3.1-8b-instant` via Groq |
+| Orchestrator LLM | Your choice of model via [Groq](https://groq.com) (set in `.env`) |
+| Explore / Compactor LLM | Your choice of model via Groq (set in `.env`) |
 | LLM Integration | [langchain-groq](https://python.langchain.com/docs/integrations/chat/groq) |
 | Code Search | ripgrep (`rg`) with pure-Python fallback |
 | Symbol Extraction | [tree-sitter](https://tree-sitter.github.io/) — AST-level parsing, 8 languages |
@@ -274,7 +258,7 @@ Scout-any-repo/
 │   │   └── symbol_extractor.py # tree-sitter AST symbol table (+ regex fallback)
 │   │
 │   ├── agents/
-│   │   └── explore_agent.py    # Haiku-powered sub-agent as a LangChain @tool
+│   │   └── explore_agent.py    # Groq-powered sub-agent as a LangChain @tool
 │   │
 │   └── graph/
 │       ├── state.py            # AgentState TypedDict (extends MessagesState)
